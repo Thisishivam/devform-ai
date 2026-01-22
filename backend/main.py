@@ -5,7 +5,6 @@ from pydantic import BaseModel
 import requests
 import os
 from supabase import create_client, Client
-import stripe
 from datetime import datetime, timedelta
 import json
 from typing import Optional
@@ -210,4 +209,5 @@ async def create_user(email: str):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=10000)
