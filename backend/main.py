@@ -8,7 +8,6 @@ from supabase import create_client, Client
 from datetime import datetime, timedelta
 import json
 from typing import Optional
-from typing import Optional
 
 app = FastAPI()
 security = HTTPBearer()
@@ -34,6 +33,9 @@ class GenerateRequest(BaseModel):
 class CreditRequest(BaseModel):
     user_id: str
     credits_used: int
+
+class UserCreate(BaseModel):  # ADD THIS
+    email: str
 
 # Helper: Get user from token
 async def get_user_from_token(token: str):
@@ -228,3 +230,4 @@ async def create_user(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=10000)
+
