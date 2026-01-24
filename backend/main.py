@@ -8,6 +8,7 @@ from supabase import create_client, Client
 from datetime import datetime, timedelta
 import json
 from typing import Optional
+from typing import Optional
 
 app = FastAPI()
 security = HTTPBearer()
@@ -21,6 +22,8 @@ supabase: Client = create_client(
 # DeepSeek API
 DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
+
+
 
 class GenerateRequest(BaseModel):
     messages: list
@@ -152,6 +155,8 @@ async def generate_code(request: GenerateRequest, token: str = Depends(security)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
 @app.get("/user/status")
 async def user_status(token: str = Depends(security)):
     user = await get_user_from_token(token.credentials)
@@ -177,28 +182,41 @@ async def user_status(token: str = Depends(security)):
     }
 
 @app.post("/user/create")
-async def create_user(email: str):
+async def create_user(
+    email: Optional[str] = None,
+    user: Optional[UserCreate] = None
+):
+    user_email = email or (user.email if user else None)
+    
+    if not user_email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    
     # Check if user exists
-    existing = supabase.table('users')\
+    response = supabase.table('users')\
         .select('*')\
-        .eq('email', email)\
+        .eq('email', user_email)\
         .execute()
     
-    if existing.data:
-        return {"error": "User already exists"}
+    if response.data:
+        return {
+            "message": "User already exists",
+            "api_token": response.data[0]['api_token'],
+            "tier": response.data[0]['tier'],
+            "credits": response.data[0]['credits']
+        }
     
     # Create new user
     import uuid
     api_token = str(uuid.uuid4())
     
     new_user = {
-        'email': email,
+        'email': user_email,
         'api_token': api_token,
         'tier': 'free',
         'credits': 100
     }
     
-    response = supabase.table('users').insert(new_user).execute()
+    insert_response = supabase.table('users').insert(new_user).execute()
     
     return {
         "message": "User created",
@@ -209,5 +227,4 @@ async def create_user(email: str):
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=10000)
