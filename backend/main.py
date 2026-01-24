@@ -10,6 +10,15 @@ import json
 from typing import Optional
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "https://devform.com"],  # Add your domains
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 security = HTTPBearer()
 
 # Initialize Supabase
@@ -230,4 +239,5 @@ async def create_user(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=10000)
+
 
