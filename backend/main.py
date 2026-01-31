@@ -87,7 +87,7 @@ async def check_user_credits(user_id: str, credits_needed: int = 1):
 
             today_usage = sum([r['credits_used'] for r in usage_resp.data]) if usage_resp.data else 0
 
-            # Free tier: Max 100 credits/day
+            # Free tier: Max 500 credits/day
             if today_usage + credits_needed > 500:
                 return False, "Daily limit exceeded. Upgrade to Pro."
 
@@ -231,7 +231,7 @@ async def create_user(
         'email': user_email,
         'api_token': api_token,
         'tier': 'free',
-        'credits': 100
+        'credits': 500
     }
     
     insert_response = supabase.table('users').insert(new_user).execute()
@@ -240,9 +240,10 @@ async def create_user(
         "message": "User created",
         "api_token": api_token,
         "tier": "free",
-        "credits": 100
+        "credits": 500
     }
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=10000)
+
