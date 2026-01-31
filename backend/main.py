@@ -1,13 +1,13 @@
-# backend/main.py
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware  # Add this
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 import requests
 import os
 from supabase import create_client, Client
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
-from typing import Optional
+from typing import Optional, Dict, Any  # Added Dict, Any
 
 app = FastAPI()
 security = HTTPBearer()
@@ -229,3 +229,4 @@ async def create_user(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=10000)
+
