@@ -210,20 +210,20 @@ async def create_user(
         .execute()
     
     if response.data:
-    user_data = response.data[0]
+        user_data = response.data[0]
     # Update existing free users to 200 credits
-    if user_data['tier'] == 'free' and user_data['credits'] < 500:
-        supabase.table('users')\
-            .update({'credits': 500})\
-            .eq('id', user_data['id'])\
-            .execute()
-        user_data['credits'] = 500
-    return {
-        "message": "User already exists",
-        "api_token": response.data[0]['api_token'],
-        "tier": response.data[0]['tier'],
-        "credits": response.data[0]['credits']
-    }
+        if user_data['tier'] == 'free' and user_data['credits'] < 500:
+            supabase.table('users')\
+                .update({'credits': 500})\
+                .eq('id', user_data['id'])\
+                .execute()
+            user_data['credits'] = 500
+        return {
+            "message": "User already exists",
+            "api_token": response.data[0]['api_token'],
+            "tier": response.data[0]['tier'],
+            "credits": response.data[0]['credits']
+        }
     
     # Create new user
     import uuid
@@ -248,6 +248,7 @@ async def create_user(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=10000)
+
 
 
 
