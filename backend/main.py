@@ -89,7 +89,7 @@ async def check_user_credits(user_id: str, credits_needed: int = 1):
             today_usage = sum([r['credits_used'] for r in usage_resp.data]) if usage_resp.data else 0
             
             # Free tier: Max 100 credits/day
-            if today_usage + credits_needed > 100:
+            if today_usage + credits_needed > 500:
                 return False, "Daily limit exceeded. Upgrade to Pro."
         
         # Check total credits
@@ -210,12 +210,20 @@ async def create_user(
         .execute()
     
     if response.data:
-        return {
-            "message": "User already exists",
-            "api_token": response.data[0]['api_token'],
-            "tier": response.data[0]['tier'],
-            "credits": response.data[0]['credits']
-        }
+    user_data = response.data[0]
+    # Update existing free users to 200 credits
+    if user_data['tier'] == 'free' and user_data['credits'] < 500:
+        supabase.table('users')\
+            .update({'credits': 500})\
+            .eq('id', user_data['id'])\
+            .execute()
+        user_data['credits'] = 500
+    return {
+        "message": "User already exists",
+        "api_token": response.data[0]['api_token'],
+        "tier": response.data[0]['tier'],
+        "credits": response.data[0]['credits']
+    }
     
     # Create new user
     import uuid
@@ -225,7 +233,7 @@ async def create_user(
         'email': user_email,
         'api_token': api_token,
         'tier': 'free',
-        'credits': 100
+        'credits': 500
     }
     
     insert_response = supabase.table('users').insert(new_user).execute()
@@ -234,12 +242,13 @@ async def create_user(
         "message": "User created",
         "api_token": api_token,
         "tier": "free",
-        "credits": 100
+        "credits": 500
     }
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=10000)
+
 
 
 
