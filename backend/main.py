@@ -133,36 +133,38 @@ async def generate_code(request: GenerateRequest, token: str = Depends(security)
                 "temperature": request.temperature,
                 "stream": request.stream
             },
-            timeout=60
         )
-
+        
         if deepseek_response.status_code != 200:
             raise HTTPException(status_code=500, detail="AI service error")
-
+        
         result = deepseek_response.json()
         content = result['choices'][0]['message']['content']
-
-        # 5. Deduct credits
+        
+        # 5. Deduct credits (based on actual usage, not estimate)
+        actual_tokens = result.get('usage', {}).get('total_tokens', 0)
+        actual_credits = max(1, actual_tokens // 100)
+        
         supabase.table('users')\
-            .update({'credits': user['credits'] - credits_needed})\
+            .update({'credits': user['credits'] - actual_credits})\
             .eq('id', user['id'])\
             .execute()
-
+        
         # 6. Log generation
         supabase.table('generations').insert({
             'user_id': user['id'],
             'prompt': json.dumps(request.messages[-1]) if request.messages else '',
-            'credits_used': credits_needed
+            'credits_used': actual_credits
         }).execute()
-
+        
+        # RETURN FULL DEEPSEEK RESPONSE, not just content
         return {
             "content": content,
-            "credits_used": credits_needed,
-            "remaining_credits": user['credits'] - credits_needed
+            "api_response": result,  # CRITICAL: Return full response
+            "credits_used": actual_credits,
+            "remaining_credits": user['credits'] - actual_credits
         }
-
-    except requests.exceptions.Timeout:
-        raise HTTPException(status_code=504, detail="Request timeout")
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
