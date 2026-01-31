@@ -8,18 +8,8 @@ from supabase import create_client, Client
 from datetime import datetime, timedelta
 import json
 from typing import Optional
-from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # For development, allow all origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 security = HTTPBearer()
 
 # Initialize Supabase
@@ -43,9 +33,6 @@ class GenerateRequest(BaseModel):
 class CreditRequest(BaseModel):
     user_id: str
     credits_used: int
-
-class UserCreate(BaseModel):  # ADD THIS
-    email: str
 
 # Helper: Get user from token
 async def get_user_from_token(token: str):
@@ -89,7 +76,7 @@ async def check_user_credits(user_id: str, credits_needed: int = 1):
             today_usage = sum([r['credits_used'] for r in usage_resp.data]) if usage_resp.data else 0
             
             # Free tier: Max 100 credits/day
-            if today_usage + credits_needed > 500:
+            if today_usage + credits_needed > 100:
                 return False, "Daily limit exceeded. Upgrade to Pro."
         
         # Check total credits
@@ -134,7 +121,6 @@ async def generate_code(request: GenerateRequest, token: str = Depends(security)
                 "temperature": request.temperature,
                 "stream": request.stream
             },
-            timeout=60
         )
         
         if deepseek_response.status_code != 200:
@@ -143,9 +129,12 @@ async def generate_code(request: GenerateRequest, token: str = Depends(security)
         result = deepseek_response.json()
         content = result['choices'][0]['message']['content']
         
-        # 5. Deduct credits
+        # 5. Deduct credits (based on actual usage, not estimate)
+        actual_tokens = result.get('usage', {}).get('total_tokens', 0)
+        actual_credits = max(1, actual_tokens // 100)
+        
         supabase.table('users')\
-            .update({'credits': user['credits'] - credits_needed})\
+            .update({'credits': user['credits'] - actual_credits})\
             .eq('id', user['id'])\
             .execute()
         
@@ -153,17 +142,17 @@ async def generate_code(request: GenerateRequest, token: str = Depends(security)
         supabase.table('generations').insert({
             'user_id': user['id'],
             'prompt': json.dumps(request.messages[-1]) if request.messages else '',
-            'credits_used': credits_needed
+            'credits_used': actual_credits
         }).execute()
         
+        # RETURN FULL DEEPSEEK RESPONSE, not just content
         return {
             "content": content,
-            "credits_used": credits_needed,
-            "remaining_credits": user['credits'] - credits_needed
+            "api_response": result,  # CRITICAL: Return full response
+            "credits_used": actual_credits,
+            "remaining_credits": user['credits'] - actual_credits
         }
         
-    except requests.exceptions.Timeout:
-        raise HTTPException(status_code=504, detail="Request timeout")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -210,14 +199,6 @@ async def create_user(
         .execute()
     
     if response.data:
-        user_data = response.data[0]
-    # Update existing free users to 200 credits
-        if user_data['tier'] == 'free' and user_data['credits'] < 500:
-            supabase.table('users')\
-                .update({'credits': 500})\
-                .eq('id', user_data['id'])\
-                .execute()
-            user_data['credits'] = 500
         return {
             "message": "User already exists",
             "api_token": response.data[0]['api_token'],
@@ -233,7 +214,7 @@ async def create_user(
         'email': user_email,
         'api_token': api_token,
         'tier': 'free',
-        'credits': 500
+        'credits': 100
     }
     
     insert_response = supabase.table('users').insert(new_user).execute()
@@ -242,16 +223,9 @@ async def create_user(
         "message": "User created",
         "api_token": api_token,
         "tier": "free",
-        "credits": 500
+        "credits": 100
     }
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=10000)
-
-
-
-
-
-
-
